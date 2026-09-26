@@ -65,7 +65,7 @@
           "min_thickness": 0.25,
           "pad_connection": 1,
           "remove_islands": 2,
-          "thermal_relief_gap": 0.4,
+          "thermal_relief_gap": 0.3,
           "thermal_relief_spoke_width": 0.4
         }
       },
@@ -82,11 +82,7 @@
           ""
         ],
         [
-          "lib_footprint_mismatch|70501100|121868600|af558e56-8c42-4490-b285-ee8708f0f035|00000000-0000-0000-0000-000000000000",
-          ""
-        ],
-        [
-          "lib_footprint_mismatch|76201100|137848600|edaf7907-2de9-49b3-ac4d-4c29e0a1b8c7|00000000-0000-0000-0000-000000000000",
+          "lib_footprint_mismatch|76301100|96298600|edaf7907-2de9-49b3-ac4d-4c29e0a1b8c7|00000000-0000-0000-0000-000000000000",
           ""
         ]
       ],
@@ -694,7 +690,7 @@
         "uuid": "0b21b9f8-9742-40ac-879c-1bf6a1292b1f"
       }
     ],
-    "used_designators": "R1-5,J1-3,SW1,D39,#PWR101-120,C1-16,U1,Y1",
+    "used_designators": "R1-5,J1-5,SW1,D39,C1-16,#PWR101-122,Y1,U1",
     "variants": []
   },
   "sheets": [
