@@ -6,6 +6,8 @@
 
 CRGB leds[NUM_LEDS];
 
+
+
 void setup()
 {
     FastLED.addLeds<WS2812B, LED_PIN, GRB>(leds, NUM_LEDS);
@@ -50,4 +52,8 @@ void decay(byte red, byte green, byte blue, byte meteorSize, byte decaySpeed, in
     FastLED.show());
     delay(SpeedDelay);
   }
+}
+
+uint8_t index(uint8_t led){
+  return (led == 45)? 21 : led;
 }
