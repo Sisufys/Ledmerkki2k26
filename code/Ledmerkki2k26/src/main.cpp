@@ -105,19 +105,19 @@ void loop() {
 
 void pendulumWave() {
   for (int i = 0; i < NUM_LEDS; i++) {  //go through all the leds
-    accums[i] += 130 - i;               //increment the corresponding accumulator different value per led
+    accums[i] += 88 - (i);               //increment the corresponding accumulator different value per led
     if (accums[i] >= 16384) {//16384
       accums[i] -= 16384;
       led_state[i] = 5;  // start the cycle
       hue = 170;
     }
     //if brightness cycle has finished, zero brightness
-    if (led_state[i] > 505) {
+    if (led_state[i] > 508) {
       led_state[i] = 0;
     }
     //if brightness cycle has not finished and is ongoing, increment brightness
     if (led_state[i] > 0) {
-      led_state[i] += 5;
+      led_state[i] += 2;
     }
     uint16_t s = led_state[i];
     //calculate brightess
