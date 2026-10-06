@@ -5,6 +5,7 @@
 #define LED_PIN 8
 #define NUM_LEDS 45
 #define BRIGHTNESS 24
+#define BUTTON 2
 
 //(x, y) coordinates for each led, roughly from (0,0) to (128, 256)
 //middle point being the 23rd led (76, 129)
@@ -63,14 +64,26 @@ uint8_t curBrg = 0;
 
 CRGB leds[NUM_LEDS];
 
-static uint16_t position = 0;
 static uint16_t hue = 0;
 
 uint32_t accums[NUM_LEDS];     // used in pendulum wave effect to accumulate sum, to know when to blink a led...
 uint16_t led_state[NUM_LEDS];  // used in pendulum wave effect to know which direction the current led should be fading...
 
-void setup() {
+uint32_t lastMillis = 0;
+uint32_t tick = 0;
+uint32_t t = 0;
 
+int phpos = 0;
+
+const uint8_t con = 255 / NUM_LEDS;
+const uint16_t speed = 30;
+int phaseMiddle;
+uint8_t animation = 0;
+uint32_t lastButtonPress = 0;
+const uint8_t debounceDelay = 50;
+
+void setup() {
+  pinMode(BUTTON, INPUT);
   FastLED.addLeds<WS2812B, LED_PIN, GRB>(leds, NUM_LEDS);
   FastLED.setBrightness(BRIGHTNESS);
   FastLED.setDither(1);
@@ -83,34 +96,25 @@ void setup() {
   }
 }
 
-uint32_t lastMillis = 0;
-int phpos = 0;
-uint32_t tick = 0;
-uint32_t t = 0;
-
-const uint8_t con = 255 / NUM_LEDS;
-
-const uint16_t speed = 30;
-int phaseMiddle;
-uint8_t animation = 0;
-
 void loop() {
+  //poll button
   
-  
-  
-  //decay(20, 0, 255, 10, 30, 30);
-  /*
-  delay(40);
-  fadeToBlackBy(leds, NUM_LEDS, 60);
-  leds[random(NUM_LEDS)] = CRGB::Blue;
-  FastLED.show();
-  */
- 
-  if(millis() - lastMillis >= 100000){
+  if(digitalRead(BUTTON) == LOW && millis() - lastButtonPress >= debounceDelay){
+    lastButtonPress = millis();
     lastMillis = millis();
-    animation = (animation >= 3) ? 0 : animation + 1;
+    animation = (animation >= 2) ? 0 : animation + 1;
+    fadeBrightness();
+    FastLED.delay(500);
   }
 
+  //every 100 seconds switch animation
+  if(millis() - lastMillis >= 100000){
+    lastMillis = millis();
+    animation = (animation >= 2) ? 0 : animation + 1;
+    fadeBrightness();
+  }
+
+  //choose animation function, all are non blocking
   switch(animation){
     case(0):
       diagonalwaves();
@@ -122,8 +126,19 @@ void loop() {
       pendulumWave();
       break;
   }
+  
 }
 
+//fade to black, for switching animations smoothly
+//even though the animation wont update during the 200ms that we fade, it wont matter as is not visible
+//also blocks for BRIGHTNESS * 10ms... a non blocking solution would be better....
+void fadeBrightness(){
+  while(FastLED.getBrightness() > 0 ){
+    FastLED.setBrightness(FastLED.getBrightness() - 1);
+    FastLED.delay(10);
+  }
+  FastLED.clear();
+}
 
 void diagonalwaves(){
   tick = (millis() & (65535)) / 32;
@@ -180,6 +195,12 @@ void ripple(){
 }
 
 void pendulumWave() {
+  if (FastLED.getBrightness() < BRIGHTNESS) {
+    if (millis() - lastMillis > 20) {
+      lastMillis = millis();
+      FastLED.setBrightness(FastLED.getBrightness() + 1);
+    }
+  }
   for (int i = 0; i < NUM_LEDS; i++) {  //go through all the leds
     accums[i] += 88 - (i);               //increment the corresponding accumulator different value per led
     if (accums[i] >= 16384) {//16384
@@ -208,10 +229,11 @@ void pendulumWave() {
 }
 
 
-
+/*
+A 1 dimensional sinewave that slowly shifts in color
+*/
 void rgbSinewave() {
   tick = (millis() & (65535)) / 32;
-
   t = millis();
 
   if (FastLED.getBrightness() < BRIGHTNESS) {
@@ -221,9 +243,8 @@ void rgbSinewave() {
     }
   }
 
-
   for (int i = 0; i <= NUM_LEDS; i++) {
-    //problem: the middle led needs to be lit when going over it horizontally and vertilcally...
+    //problem: the middle led needs to be lit when going over it horizontally and vertically...
     //check if the middle led is brighter horizontally or vertically, and light it up the way it is brighter
     uint8_t phase = 128 + (sin16(-t * speed + (i * (65535 / (NUM_LEDS + 1)))) >> 8);
     phase = (phase < 5) ? 5 : phase;
@@ -280,47 +301,7 @@ void fluorescentStartup() {
     FastLED.delay(((i < 200) ? 12 : 3));
   }
   FastLED.setBrightness(BRIGHTNESS);
-  /*
-  lastMillis = millis();
-  while(millis() - lastMillis < 10000){
-    for(int i = 0; i < NUM_LEDS; i++){
-      leds[i] = CHSV(28, 239, 120 + sin8((255/45)*(i*10+hue*8) / 2));
-    }
-    FastLED.show();
-    hue += 1;
-    if(hue >= 1024){
-        hue -= 1024;
-    }
-    FastLED.delay(10);
-  }
-  */
 }
-
-/*
-      if(millis() - lastMillis >= 7){
-      lastMillis = millis();
-      // Fade the existing trail
-
-      fadeToBlackBy(leds, NUM_LEDS, 4);
-      
-      
-      
-      phpos = ((position / 6 == NUM_LEDS) ? 22 : position / 6); 
-      leds[phpos] = CHSV(hue / 16, 255, 255);
-
-      FastLED.show();
-
-      position++;
-      if (position > NUM_LEDS * 6)
-          position = 0;
-
-      hue += 1;
-      if(hue >= 4096){
-          hue -= 4096;
-      }
-      
-      */
-
 
 /*
 //decaymaxx, ei hyvä
@@ -349,26 +330,3 @@ void fluorescentStartup() {
     }
     */
 
-void decay(byte red, byte green, byte blue, byte meteorSize, byte decaySpeed, int SpeedDelay) {
-  FastLED.clear();
-  FastLED.show();
-
-  for (int i = 0; i < NUM_LEDS + NUM_LEDS; i++) {
-    // fade brightness of leds randomly to create variation
-    for (int j = 0; j < NUM_LEDS; j++) {
-      if (random(10) > 5) {
-        fadeToBlackBy(leds, j, decaySpeed);
-      }
-    }
-
-    // draw meteor
-    for (int j = 0; j < meteorSize; j++) {
-      if ((i - j < NUM_LEDS) && (i - j >= 0)) {
-        leds[i - j] = CRGB(red, green, blue);
-      }
-    }
-
-    FastLED.show();
-    delay(SpeedDelay);
-  }
-}

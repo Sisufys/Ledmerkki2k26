@@ -1,3 +1,4 @@
+void fadeBrightness();
 void diagonalwaves();
 void ripple();
 void pendulumWave();
