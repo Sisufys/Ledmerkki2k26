@@ -1,3 +1,5 @@
+void diagonalwaves();
+void ripple();
 void pendulumWave();
 void rgbSinewave();
 void fluorescentStartup();

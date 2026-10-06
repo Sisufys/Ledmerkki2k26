@@ -56,6 +56,9 @@ uint8_t coords[45][2] = {
   { 79, 146 }
 };
 
+//each number represens the sine of the distance of the led coordinates from the middle led
+uint8_t radii[NUM_LEDS] = {18,34,49,64,78,94,111,126,111,99,86,77,67,62,59,58,63,71,56,40,28,14,0,14,27,43,58,72,63,59,57,60,66,75,85,97,110,124,108,93,78,63,47,31,17};
+
 uint8_t curBrg = 0;
 
 CRGB leds[NUM_LEDS];
@@ -73,7 +76,7 @@ void setup() {
   FastLED.setDither(1);
   fluorescentStartup();
   FastLED.delay(2000);
-  //FastLED.setBrightness(0);
+  FastLED.setBrightness(0);
   for (int i = 0; i < NUM_LEDS; i++) {
     accums[i] = 0;
     led_state[i] = 0;
@@ -87,13 +90,14 @@ uint32_t t = 0;
 
 const uint8_t con = 255 / NUM_LEDS;
 
-const uint16_t speed = 40;
+const uint16_t speed = 30;
 int phaseMiddle;
+uint8_t animation = 0;
 
 void loop() {
   
-  pendulumWave();
-
+  
+  
   //decay(20, 0, 255, 10, 30, 30);
   /*
   delay(40);
@@ -101,6 +105,78 @@ void loop() {
   leds[random(NUM_LEDS)] = CRGB::Blue;
   FastLED.show();
   */
+ 
+  if(millis() - lastMillis >= 100000){
+    lastMillis = millis();
+    animation = (animation >= 3) ? 0 : animation + 1;
+  }
+
+  switch(animation){
+    case(0):
+      diagonalwaves();
+      break;
+    case(1):
+      ripple();
+      break;
+    case(2):
+      pendulumWave();
+      break;
+  }
+}
+
+
+void diagonalwaves(){
+  tick = (millis() & (65535)) / 32;
+  t = millis();
+
+  if (FastLED.getBrightness() < BRIGHTNESS) {
+    if (millis() - lastMillis > 20) {
+      lastMillis = millis();
+      FastLED.setBrightness(FastLED.getBrightness() + 1);
+    }
+  }
+
+  for (int i = 0; i < NUM_LEDS; i++) {
+    //magic values, speed=40
+    uint8_t phase = (sin16(- t * speed + ((coords[i][0] - 3 *coords[i][1]) * (110))) + 32768) >> 8;
+    phase = (phase < 5) ? 5 : phase;
+
+    leds[i] = CHSV(120 + (tick / 8), 255, phase);
+    //sin8(con*(i+tick))
+  
+    if (i == 22) {
+      phaseMiddle = phase;
+    }
+  }
+
+  FastLED.show();
+}
+
+void ripple(){
+  tick = (millis() & (65535)) / 32;
+  t = millis();
+
+  if (FastLED.getBrightness() < BRIGHTNESS) {
+    if (millis() - lastMillis > 20) {
+      lastMillis = millis();
+      FastLED.setBrightness(FastLED.getBrightness() + 1);
+    }
+  }
+
+  for (int i = 0; i < NUM_LEDS; i++) {
+
+    uint8_t phase = (sin16(-t * speed + (radii[i] * (500))) + 32768) >> 8;
+    phase = (phase < 5) ? 5 : phase;
+
+    leds[i] = CHSV(120 + (tick / 8), 255, phase);
+    //sin8(con*(i+tick))
+  
+    if (i == 22) {
+      phaseMiddle = phase;
+    }
+  }
+
+  FastLED.show();
 }
 
 void pendulumWave() {
