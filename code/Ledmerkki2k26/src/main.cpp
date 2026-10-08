@@ -4,7 +4,7 @@
 
 #define LED_PIN 8
 #define NUM_LEDS 45
-#define BRIGHTNESS 24
+#define BRIGHTNESS 75
 #define BUTTON 2
 
 //(x, y) coordinates for each led, roughly from (0,0) to (128, 256)
@@ -69,6 +69,8 @@ static uint16_t hue = 0;
 uint32_t accums[NUM_LEDS];     // used in pendulum wave effect to accumulate sum, to know when to blink a led...
 uint16_t led_state[NUM_LEDS];  // used in pendulum wave effect to know which direction the current led should be fading...
 
+uint32_t lastAnimationRefresh = 0;
+uint32_t lastButtonPress = 0;
 uint32_t lastMillis = 0;
 uint32_t tick = 0;
 uint32_t t = 0;
@@ -79,7 +81,7 @@ const uint8_t con = 255 / NUM_LEDS;
 const uint16_t speed = 30;
 int phaseMiddle;
 uint8_t animation = 0;
-uint32_t lastButtonPress = 0;
+
 const uint8_t debounceDelay = 50;
 
 void setup() {
@@ -103,15 +105,19 @@ void loop() {
     lastButtonPress = millis();
     lastMillis = millis();
     animation = (animation >= 2) ? 0 : animation + 1;
-    fadeBrightness();
+    fadeBrightnessDown();
+    clearVars();
     FastLED.delay(500);
   }
 
-  //every 100 seconds switch animation
-  if(millis() - lastMillis >= 100000){
+  //every n seconds switch animation
+  //n for 1 cycle of pendulumWave animation (79500 ms with delay(5) !!HALFWAY,, 102000ms with 2ms delay, full cycle)
+  if(millis() - lastMillis >= 102000){
     lastMillis = millis();
     animation = (animation >= 2) ? 0 : animation + 1;
-    fadeBrightness();
+    clearVars();
+    fadeBrightnessDown();
+    FastLED.delay(500);
   }
 
   //choose animation function, all are non blocking
@@ -129,27 +135,40 @@ void loop() {
   
 }
 
+//helper function to clear vars in between animastions
+void clearVars(){
+  for (int i = 0; i < NUM_LEDS; i++) {
+    accums[i] = 0;
+    led_state[i] = 0;
+  }
+}
+
 //fade to black, for switching animations smoothly
 //even though the animation wont update during the 200ms that we fade, it wont matter as is not visible
 //also blocks for BRIGHTNESS * 10ms... a non blocking solution would be better....
-void fadeBrightness(){
+void fadeBrightnessDown(){
   while(FastLED.getBrightness() > 0 ){
     FastLED.setBrightness(FastLED.getBrightness() - 1);
-    FastLED.delay(10);
+    FastLED.delay(5);
   }
   FastLED.clear();
 }
 
+void fadeBrightnessUp(){
+  if (FastLED.getBrightness() < BRIGHTNESS) {
+    if (millis() - lastAnimationRefresh > 5) {
+      lastAnimationRefresh = millis();
+      FastLED.setBrightness(FastLED.getBrightness() + 1);
+    }
+  }
+}
+
+//non blocking and timing is millis() bound, so does time between function calls will not affect speed
 void diagonalwaves(){
   tick = (millis() & (65535)) / 32;
   t = millis();
 
-  if (FastLED.getBrightness() < BRIGHTNESS) {
-    if (millis() - lastMillis > 20) {
-      lastMillis = millis();
-      FastLED.setBrightness(FastLED.getBrightness() + 1);
-    }
-  }
+  fadeBrightnessUp();
 
   for (int i = 0; i < NUM_LEDS; i++) {
     //magic values, speed=40
@@ -167,16 +186,13 @@ void diagonalwaves(){
   FastLED.show();
 }
 
+//non blocking and timing is millis() bound, so does time between function calls will not affect speed
 void ripple(){
   tick = (millis() & (65535)) / 32;
   t = millis();
 
-  if (FastLED.getBrightness() < BRIGHTNESS) {
-    if (millis() - lastMillis > 20) {
-      lastMillis = millis();
-      FastLED.setBrightness(FastLED.getBrightness() + 1);
-    }
-  }
+  fadeBrightnessUp();
+
 
   for (int i = 0; i < NUM_LEDS; i++) {
 
@@ -194,13 +210,17 @@ void ripple(){
   FastLED.show();
 }
 
+//timing is NOT millis() bound
 void pendulumWave() {
+  //fade in brightness
   if (FastLED.getBrightness() < BRIGHTNESS) {
-    if (millis() - lastMillis > 20) {
-      lastMillis = millis();
+    if (millis() - lastAnimationRefresh > 20) {
+      lastAnimationRefresh = millis();
       FastLED.setBrightness(FastLED.getBrightness() + 1);
     }
   }
+
+  //the actual animation logic
   for (int i = 0; i < NUM_LEDS; i++) {  //go through all the leds
     accums[i] += 88 - (i);               //increment the corresponding accumulator different value per led
     if (accums[i] >= 16384) {//16384
@@ -225,23 +245,20 @@ void pendulumWave() {
   }
 
   FastLED.show();
-  FastLED.delay(5);
+  FastLED.delay(2);
 }
 
 
 /*
 A 1 dimensional sinewave that slowly shifts in color
+non blocking and timing is millis() bound, so does time between function calls will not affect speed
 */
 void rgbSinewave() {
   tick = (millis() & (65535)) / 32;
   t = millis();
 
-  if (FastLED.getBrightness() < BRIGHTNESS) {
-    if (millis() - lastMillis > 20) {
-      lastMillis = millis();
-      FastLED.setBrightness(FastLED.getBrightness() + 1);
-    }
-  }
+  fadeBrightnessUp();
+
 
   for (int i = 0; i <= NUM_LEDS; i++) {
     //problem: the middle led needs to be lit when going over it horizontally and vertically...
