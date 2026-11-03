@@ -4,7 +4,7 @@
 
 #define LED_PIN 8
 #define NUM_LEDS 45
-#define BRIGHTNESS 75
+#define BRIGHTNESS 85
 #define BUTTON 2
 
 //(x, y) coordinates for each led, roughly from (0,0) to (128, 256)
@@ -74,6 +74,8 @@ uint32_t lastButtonPress = 0;
 uint32_t lastMillis = 0;
 uint32_t tick = 0;
 uint32_t t = 0;
+uint8_t buttonHeld = 0;
+uint8_t colorMode = 0;
 
 int phpos = 0;
 
@@ -99,15 +101,38 @@ void setup() {
 }
 
 void loop() {
+
   //poll button
-  
   if(digitalRead(BUTTON) == LOW && millis() - lastButtonPress >= debounceDelay){
     lastButtonPress = millis();
     lastMillis = millis();
-    animation = (animation >= 2) ? 0 : animation + 1;
-    fadeBrightnessDown();
+    //fade leds to black, clear variables
+    fadeBrightnessDown(2);
     clearVars();
-    FastLED.delay(500);
+    FastLED.delay(100);
+    
+    //handle long button press -> change color mode
+    t = 0;
+    buttonHeld = 0;
+    while(digitalRead(BUTTON) == LOW){
+      FastLED.setBrightness(BRIGHTNESS);
+      leds[t] = CRGB(0, 0, 100);
+      FastLED.delay(25);
+      t++;
+      buttonHeld++;
+      if(buttonHeld == 45){
+        colorMode = (colorMode < 3) ? colorMode + 1 : 0;
+        break;
+      }
+    }
+    //if button long pressed, fade leds to black again
+    if(FastLED.getBrightness() != 0){
+      fadeBrightnessDown(2);
+    }
+    //if button not long pressed, advance animation by one
+    else{
+      animation = (animation >= 2) ? 0 : animation + 1;
+    }
   }
 
   //every n seconds switch animation
@@ -116,20 +141,20 @@ void loop() {
     lastMillis = millis();
     animation = (animation >= 2) ? 0 : animation + 1;
     clearVars();
-    fadeBrightnessDown();
+    fadeBrightnessDown(4);
     FastLED.delay(500);
   }
 
   //choose animation function, all are non blocking
   switch(animation){
     case(0):
-      diagonalwaves();
+      diagonalwaves(colorMode);
       break;
     case(1):
-      ripple();
+      ripple(colorMode);
       break;
     case(2):
-      pendulumWave();
+      pendulumWave(colorMode);
       break;
   }
   
@@ -146,15 +171,16 @@ void clearVars(){
 //fade to black, for switching animations smoothly
 //even though the animation wont update during the 200ms that we fade, it wont matter as is not visible
 //also blocks for BRIGHTNESS * 10ms... a non blocking solution would be better....
-void fadeBrightnessDown(){
+void fadeBrightnessDown(int delayms){
   while(FastLED.getBrightness() > 0 ){
     FastLED.setBrightness(FastLED.getBrightness() - 1);
-    FastLED.delay(5);
+    FastLED.delay(delayms);
   }
   FastLED.clear();
 }
 
-void fadeBrightnessUp(){
+
+inline void fadeBrightnessUp(){
   if (FastLED.getBrightness() < BRIGHTNESS) {
     if (millis() - lastAnimationRefresh > 5) {
       lastAnimationRefresh = millis();
@@ -164,7 +190,7 @@ void fadeBrightnessUp(){
 }
 
 //non blocking and timing is millis() bound, so does time between function calls will not affect speed
-void diagonalwaves(){
+void diagonalwaves(uint8_t color){
   tick = (millis() & (65535)) / 32;
   t = millis();
 
@@ -175,19 +201,21 @@ void diagonalwaves(){
     uint8_t phase = (sin16(- t * speed + ((coords[i][0] - 3 *coords[i][1]) * (110))) + 32768) >> 8;
     phase = (phase < 5) ? 5 : phase;
 
-    leds[i] = CHSV(120 + (tick / 8), 255, phase);
-    //sin8(con*(i+tick))
-  
-    if (i == 22) {
-      phaseMiddle = phase;
+    if(color == 0){
+      leds[i] = CHSV(160, 255, phase);
+    }
+    else if(color == 1){
+      leds[i] = CHSV(120 + (tick / 8), 255, phase);
+    }
+    else{
+      leds[i] = CHSV(120 + (tick / 8), 255, phase);
     }
   }
-
   FastLED.show();
 }
 
 //non blocking and timing is millis() bound, so does time between function calls will not affect speed
-void ripple(){
+void ripple(uint8_t color){
   tick = (millis() & (65535)) / 32;
   t = millis();
 
@@ -199,19 +227,26 @@ void ripple(){
     uint8_t phase = (sin16(-t * speed + (radii[i] * (500))) + 32768) >> 8;
     phase = (phase < 5) ? 5 : phase;
 
-    leds[i] = CHSV(120 + (tick / 8), 255, phase);
-    //sin8(con*(i+tick))
-  
-    if (i == 22) {
-      phaseMiddle = phase;
+
+    if(color == 0){
+      leds[i] = CHSV(160, 255, phase);
     }
+    else if(color == 1){
+      leds[i] = CHSV(120 + (tick / 8), 255, phase);
+    }
+    else{
+      leds[i] = CHSV(120 + (tick / 8), 255, phase);
+    }
+    //sin8(con*(i+tick))
   }
 
   FastLED.show();
 }
 
 //timing is NOT millis() bound
-void pendulumWave() {
+void pendulumWave(uint8_t color) {
+  tick = (millis() & (65535)) / 32;
+
   //fade in brightness
   if (FastLED.getBrightness() < BRIGHTNESS) {
     if (millis() - lastAnimationRefresh > 20) {
@@ -228,20 +263,31 @@ void pendulumWave() {
       led_state[i] = 4;  // start the cycle
       hue = 170;
     }
-    //if brightness cycle has finished, zero brightness
-    if (led_state[i] > 506) {
-      led_state[i] = 0;
-    }
+
     //if brightness cycle has not finished and is ongoing, increment brightness
     if (led_state[i] > 0) {
       led_state[i] += 4;
+    }
+    //if brightness cycle has finished, zero brightness
+    if (led_state[i] > 510) {
+      led_state[i] = 0;
     }
     uint16_t s = led_state[i];
     //calculate brightess
     uint8_t brg = (s > 255) ? 510 - s : s;
     //blue, second half fade to yellow (roughly 170 -> 35)
 
-    leds[i] = CHSV(HUE_BLUE, 255, brg); //pride mode: brg = 255, hue = (s / 2), blue to yellow: ((s > 230) ? 170 : 35)
+    //leds[i] = CHSV(120 + (tick / 8), 255, brg); //pride mode: brg = 255, hue = (s / 2), blue to yellow: ((s > 230) ? 170 : 35)
+    if(color == 0){
+      leds[i] = CHSV(160, 255, brg);
+    }
+    else if(color == 1){
+      leds[i] = CHSV(120 + (tick / 8), 255, brg);
+    }
+    else{
+      leds[i] = CHSV((s / 2), 255, 255);
+    }
+  
   }
 
   FastLED.show();
