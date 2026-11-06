@@ -4,8 +4,16 @@
 
 #define LED_PIN 8
 #define NUM_LEDS 45
-#define BRIGHTNESS 85
-#define BUTTON 2
+#define BRIGHTNESS 25
+#define BUTTON1 2
+#define BUTTON2 13
+
+typedef enum {
+  LOW_BRG,
+  MEDIUM_BRG,
+  HIGH_BRG,
+  ULTRA_BRG
+} brg_state;
 
 //(x, y) coordinates for each led, roughly from (0,0) to (128, 256)
 //middle point being the 23rd led (76, 129)
@@ -61,6 +69,7 @@ uint8_t coords[45][2] = {
 uint8_t radii[NUM_LEDS] = {18,34,49,64,78,94,111,126,111,99,86,77,67,62,59,58,63,71,56,40,28,14,0,14,27,43,58,72,63,59,57,60,66,75,85,97,110,124,108,93,78,63,47,31,17};
 
 uint8_t curBrg = 0;
+brg_state brgstate = LOW_BRG;
 
 CRGB leds[NUM_LEDS];
 
@@ -76,6 +85,7 @@ uint32_t tick = 0;
 uint32_t t = 0;
 uint8_t buttonHeld = 0;
 uint8_t colorMode = 0;
+uint8_t brightness = 25;
 
 int phpos = 0;
 
@@ -87,9 +97,10 @@ uint8_t animation = 0;
 const uint8_t debounceDelay = 50;
 
 void setup() {
-  pinMode(BUTTON, INPUT);
+  pinMode(BUTTON1, INPUT);
+  pinMode(BUTTON2, INPUT);
   FastLED.addLeds<WS2812B, LED_PIN, GRB>(leds, NUM_LEDS);
-  FastLED.setBrightness(BRIGHTNESS);
+  FastLED.setBrightness(brightness);
   FastLED.setDither(1);
   fluorescentStartup();
   FastLED.delay(2000);
@@ -103,7 +114,7 @@ void setup() {
 void loop() {
 
   //poll button
-  if(digitalRead(BUTTON) == LOW && millis() - lastButtonPress >= debounceDelay){
+  if(digitalRead(BUTTON1) == LOW && millis() - lastButtonPress >= debounceDelay){
     lastButtonPress = millis();
     lastMillis = millis();
     //fade leds to black, clear variables
@@ -114,8 +125,8 @@ void loop() {
     //handle long button press -> change color mode
     t = 0;
     buttonHeld = 0;
-    while(digitalRead(BUTTON) == LOW){
-      FastLED.setBrightness(BRIGHTNESS);
+    while(digitalRead(BUTTON1) == LOW){
+      FastLED.setBrightness(brightness);
       leds[t] = CRGB(0, 0, 100);
       FastLED.delay(25);
       t++;
@@ -132,6 +143,32 @@ void loop() {
     //if button not long pressed, advance animation by one
     else{
       animation = (animation >= 2) ? 0 : animation + 1;
+    }
+  }
+
+  if(digitalRead(BUTTON2) == LOW && millis() - lastButtonPress >= debounceDelay * 10){
+    lastButtonPress = millis();
+    switch(brgstate){
+      case(LOW_BRG):
+        brightness = 30;
+        FastLED.setBrightness(brightness);
+        brgstate = MEDIUM_BRG;
+        break;
+      case(MEDIUM_BRG):
+        brightness = 60;          
+        FastLED.setBrightness(brightness);
+        brgstate = HIGH_BRG;
+        break;
+      case(HIGH_BRG):
+        brightness = 90;
+        FastLED.setBrightness(brightness);
+        brgstate = ULTRA_BRG;
+        break;
+      case(ULTRA_BRG):
+        brightness = 120;
+        FastLED.setBrightness(brightness);
+        brgstate = LOW_BRG;
+        break;
     }
   }
 
@@ -181,7 +218,7 @@ void fadeBrightnessDown(int delayms){
 
 
 inline void fadeBrightnessUp(){
-  if (FastLED.getBrightness() < BRIGHTNESS) {
+  if (FastLED.getBrightness() < brightness) {
     if (millis() - lastAnimationRefresh > 5) {
       lastAnimationRefresh = millis();
       FastLED.setBrightness(FastLED.getBrightness() + 1);
@@ -248,7 +285,7 @@ void pendulumWave(uint8_t color) {
   tick = (millis() & (65535)) / 32;
 
   //fade in brightness
-  if (FastLED.getBrightness() < BRIGHTNESS) {
+  if (FastLED.getBrightness() < brightness) {
     if (millis() - lastAnimationRefresh > 20) {
       lastAnimationRefresh = millis();
       FastLED.setBrightness(FastLED.getBrightness() + 1);
@@ -363,7 +400,7 @@ void fluorescentStartup() {
                  ((uint16_t)11 * v) / 255));
     FastLED.delay(((i < 200) ? 12 : 3));
   }
-  FastLED.setBrightness(BRIGHTNESS);
+  FastLED.setBrightness(brightness);
 }
 
 /*
